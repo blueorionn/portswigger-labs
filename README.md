@@ -37,7 +37,7 @@ This repo contains the solutions for the PortSwigger Labs available in the Acade
 | 26 | HTTP Host header attacks |  0/2 | 0/4 | 0/1 |
 | 27 | HTTP request smuggling | - | 0/15 | 0/6 |
 | 28 | OAuth authentication |  0/1 | 0/4 | 0/1 |
-| 29 | JWT attacks | :white_check_mark: 2/2 | :white_check_mark: 4/4 | 0/2 |
+| 29 | JWT attacks | :white_check_mark: 2/2 | :white_check_mark: 4/4 | :white_check_mark: 2/2 |
 | 30 | Prototype pollution | - | 0/9 | 0/1 |
 | 31 | Essential skills | - | 0/1 | - |
 
