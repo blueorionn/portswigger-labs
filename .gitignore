@@ -19,5 +19,7 @@ __pycache__/
 .coverage
 htmlcov/
 
-# Ignore temp
-temp
+# exclude folder
+temp/
+todo/
+.codewhale/
