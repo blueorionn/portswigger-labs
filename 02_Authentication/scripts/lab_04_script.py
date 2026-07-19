@@ -113,7 +113,7 @@ async def bruteforce_password(
 async def main():
     """Main asynchronous function."""
     parser = argparse.ArgumentParser(
-        description="Solve Lab: Username enumeration via different responses."
+        description="Solve Lab: Username enumeration via subtly different responses."
     )
     parser.add_argument(
         "-u",
